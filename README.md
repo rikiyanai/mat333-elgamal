@@ -1,4 +1,4 @@
-# ElGamal Encryption: Interactive 3D Demo and DLP Visualizations
+# ElGamal Encryption: Interactive 3D Demo
 
 Python companion to my MAT331 number theory project on ElGamal public key encryption.
 
@@ -6,14 +6,7 @@ The Maple implementation and full writeup are in the main project directory. Thi
 
 ## Files
 
-- `elgamal.py` - Core library: keygen, encrypt, decrypt, text message handling, baby-step giant-step DLP solver
-- `elgamal_demo.py` - Interactive demo with 5 modes (encrypt/decrypt, BSGS key cracking, 3 interactive 3D visualizations)
-
-### Generated plots
-
-- `dlp_landscape_3d.png` - 3D surface of g^x mod p showing the one-way function's chaotic output
-- `ciphertext_cloud_3d.png` - 3D ciphertext scatter (c1, c2, plaintext) showing probabilistic encryption
-- `bsgs_helix_3d.png` - 3D cyclic group helix with baby/giant step collision visualization
+`elgamal.py` contains the core library (keygen, encrypt, decrypt, text message handling, baby step giant step DLP solver). `elgamal_demo.py` is the interactive demo with 5 modes including 3 interactive 3D visualizations.
 
 ## Requirements
 
@@ -27,15 +20,15 @@ pip3 install matplotlib numpy colorama
 python3 elgamal_demo.py
 ```
 
-The interactive menu offers:
+The interactive menu offers five modes:
 
-1. **Encrypt / Decrypt** - Generate keys, encrypt a message, decrypt it, see the probabilistic property
-2. **Crack a key (BSGS)** - Generate a key and break it with baby-step giant-step
-3. **3D: DLP One-Way Landscape** - 3D surface plot of g^x mod p with wireframe toggle, plus 2D slice showing the inverse problem
-4. **3D: Ciphertext Cloud** - 3D scatter of (c1, c2, plaintext) showing same-message encryptions form distinct z-layers that overlap in projection, with layer toggle
-5. **3D: BSGS Collision Helix** - Cyclic group mapped to 3D helix, baby/giant steps spiral until collision, with spin control
+1. **Encrypt / Decrypt** generates keys, encrypts a message, decrypts it, and shows the probabilistic property.
+2. **Crack a key (BSGS)** generates a key and breaks it with baby step giant step.
+3. **3D: DLP One-Way Landscape** renders g^x mod p as a 3D surface across multiple primes, with a 2D slice showing the inverse problem.
+4. **3D: Ciphertext Cloud** plots (c1, c2, plaintext) in 3D, showing same-message encryptions form distinct z-layers that overlap in projection.
+5. **3D: BSGS Collision Grid** visualizes the sqrt(p) x sqrt(p) search structure as a 3D surface, with the collision valley where baby and giant steps match.
 
-All 3D plots feature interactive rotation, hover annotations, and toggle buttons (matching the style from my MAT200 complex roots visualizer).
+All 3D plots feature interactive rotation, hover annotations, and toggle buttons.
 
 ## Sample Visualizations
 
@@ -43,4 +36,4 @@ All 3D plots feature interactive rotation, hover annotations, and toggle buttons
 
 ![Ciphertext Cloud](ciphertext_cloud_3d.png)
 
-![BSGS Collision Helix](bsgs_helix_3d.png)
+![BSGS Collision Grid](bsgs_collision_3d.png)

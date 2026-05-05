@@ -90,7 +90,7 @@ def menu():
         "  │  2. Crack a key (BSGS attack)            │",
         "  │  3. 3D: DLP One-Way Landscape            │",
         "  │  4. 3D: Ciphertext Cloud                 │",
-        "  │  5. 3D: BSGS Collision Helix             │",
+        "  │  5. 3D: BSGS Collision Grid              │",
         "  │  6. Quit                                 │",
         "  └──────────────────────────────────────────┘",
     ]
@@ -210,90 +210,67 @@ def style_2d_ax(ax):
 def mode_dlp_landscape():
     print(f"\n{Fore.YELLOW}  Building DLP one-way function landscape...{Style.RESET_ALL}")
 
-    p = 97  # small prime for visual clarity
-    g = find_generator(p)
-    print(f"    Using p = {p}, generator g = {g}")
+    # Use multiple primes so y-axis shows chaos SCALING with prime size
+    primes = [17, 31, 47, 67, 89, 97]
+    max_exp = 50  # exponents 0..49 for visual clarity
 
-    # Compute g^x mod p for all exponents
-    exponents = list(range(p - 1))
-    outputs = [pow(g, x, p) for x in exponents]
-
-    # For the 3D surface: use multiple bases
-    generators = []
-    test_g = 2
-    while len(generators) < 8 and test_g < p:
-        if pow(test_g, (p - 1) // 2, p) != 1 or pow(test_g, p - 1, p) == 1:
-            # simplified: just use several integers as bases for visual variety
-            generators.append(test_g)
-        test_g += 1
-    # Use first 6 generators for the surface
-    gens_for_surface = [find_generator(p)]
-    candidate = 3
-    while len(gens_for_surface) < 6 and candidate < p:
-        # just pick varied bases for visual effect
-        gens_for_surface.append(candidate)
-        candidate += 7
-
-    # Build surface data: X=exponent, Y=base index, Z=base^exp mod p
-    X_exp = np.arange(0, min(p - 1, 60))
-    Y_base = np.arange(len(gens_for_surface))
-    X_mesh, Y_mesh = np.meshgrid(X_exp, Y_base)
+    # Build surface: X=exponent, Y=prime index, Z=g^x mod p (normalized to [0,1])
+    X_exp = np.arange(max_exp)
+    Y_idx = np.arange(len(primes))
+    X_mesh, Y_mesh = np.meshgrid(X_exp, Y_idx)
     Z_mesh = np.zeros_like(X_mesh, dtype=float)
-    for yi, base in enumerate(gens_for_surface):
-        for xi, exp in enumerate(X_exp):
-            Z_mesh[yi, xi] = pow(base, int(exp), p)
+
+    for yi, p in enumerate(primes):
+        g = find_generator(p)
+        for xi in range(max_exp):
+            Z_mesh[yi, xi] = pow(g, xi, p) / p  # normalize to [0,1]
+        print(f"    p={p:3d}, g={g}: outputs span 1..{p-1}")
+
+    # Pick largest prime for the 2D slice
+    p_main = primes[-1]
+    g_main = find_generator(p_main)
+    exponents = list(range(max_exp))
+    outputs = [pow(g_main, x, p_main) for x in exponents]
 
     fig = plt.figure(figsize=(15, 7))
     fig.patch.set_facecolor(BG_DARK)
-    fig.suptitle("DLP One-Way Function: Forward is Easy, Inverse is Hard",
+    fig.suptitle("DLP One-Way Function: Chaos Grows with Prime Size",
                  color="white", fontsize=14, y=0.95)
 
-    # Left: 3D surface
+    # Left: 3D surface across multiple primes
     ax1 = fig.add_subplot(121, projection='3d')
     style_3d_ax(ax1)
-    surf = ax1.plot_surface(X_mesh, Y_mesh, Z_mesh, cmap='magma',
-                            alpha=0.85, edgecolor='none', antialiased=True)
+    ax1.plot_surface(X_mesh, Y_mesh, Z_mesh, cmap='magma',
+                     alpha=0.85, edgecolor='none', antialiased=True)
     ax1.set_xlabel("Exponent x", fontsize=11, labelpad=8)
-    ax1.set_ylabel("Base index", fontsize=11, labelpad=8)
-    ax1.set_zlabel("output mod p", fontsize=11, labelpad=8)
-    ax1.set_title("g^x mod p surface\n(chaotic output)", color="white", fontsize=12, pad=5)
+    ax1.set_ylabel("Prime size", fontsize=11, labelpad=8)
+    ax1.set_zlabel("g^x mod p (normalized)", fontsize=10, labelpad=8)
+    ax1.set_yticks(Y_idx)
+    ax1.set_yticklabels([str(p) for p in primes], fontsize=8)
+    ax1.set_title("g^x mod p across primes\nLarger p = more chaotic",
+                  color="white", fontsize=12, pad=5)
     ax1.view_init(elev=25, azim=-60)
 
-    # Right: 2D slice for the actual generator
+    # Right: 2D slice for largest prime
     ax2 = fig.add_subplot(122)
     style_2d_ax(ax2)
-    ax2.scatter(exponents[:60], outputs[:60], c=C_ACCENT, s=18, alpha=0.8,
+    ax2.scatter(exponents, outputs, c=C_ACCENT, s=18, alpha=0.8,
                 edgecolors="none", zorder=3)
-    ax2.plot(exponents[:60], outputs[:60], color=C_DEEP, alpha=0.3, linewidth=0.8)
+    ax2.plot(exponents, outputs, color=C_DEEP, alpha=0.3, linewidth=0.8)
     ax2.set_xlabel("Exponent x", color="white", fontsize=12)
-    ax2.set_ylabel(f"{g}^x mod {p}", color="white", fontsize=12)
-    ax2.set_title(f"2D slice: g={g}, p={p}\nLooks random (one-way property)",
+    ax2.set_ylabel(f"{g_main}^x mod {p_main}", color="white", fontsize=12)
+    ax2.set_title(f"2D slice: g={g_main}, p={p_main}\nGiven an output, find x=?",
                   color="white", fontsize=12)
-    ax2.axhline(y=outputs[42], color=C_TEAL, linestyle="--", alpha=0.6, linewidth=1.5)
-    ax2.annotate(f"Given output={outputs[42]}, find x=?",
-                 xy=(42, outputs[42]), xytext=(10, outputs[42] + 15),
+    target_x = 30
+    ax2.axhline(y=outputs[target_x], color=C_TEAL, linestyle="--", alpha=0.6, linewidth=1.5)
+    ax2.annotate(f"output={outputs[target_x]}, find x=?",
+                 xy=(target_x, outputs[target_x]),
+                 xytext=(5, outputs[target_x] + p_main * 0.15),
                  fontsize=9, color=C_TEAL,
                  arrowprops=dict(arrowstyle="->", color=C_TEAL, lw=1.2),
                  bbox=dict(boxstyle="round,pad=0.3", fc=BG_PANE, ec=C_TEAL, alpha=0.9))
 
-    # Hover annotation for 3D
-    annot = ax1.text2D(0.02, 0.95, "", transform=ax1.transAxes,
-                       color="white", fontsize=9,
-                       bbox=dict(boxstyle="round", fc=BG_PANE, ec=C_ACCENT, alpha=0.9))
-    annot.set_visible(False)
-
-    def on_hover_3d(event):
-        if event.inaxes == ax1:
-            annot.set_visible(True)
-            annot.set_text(f"Rotate to explore the chaotic landscape")
-            fig.canvas.draw_idle()
-        else:
-            annot.set_visible(False)
-            fig.canvas.draw_idle()
-
-    fig.canvas.mpl_connect('motion_notify_event', on_hover_3d)
-
-    # Toggle button: wireframe vs surface
+    # Toggle: wireframe vs surface
     ax_btn = plt.axes([0.02, 0.02, 0.12, 0.05])
     btn = Button(ax_btn, 'Wireframe', color=BG_PANE, hovercolor="#333")
     btn.label.set_color("white")
@@ -313,9 +290,12 @@ def mode_dlp_landscape():
             btn.label.set_text("Wireframe")
             state["wireframe"] = False
         ax1.set_xlabel("Exponent x", fontsize=11, labelpad=8)
-        ax1.set_ylabel("Base index", fontsize=11, labelpad=8)
-        ax1.set_zlabel("output mod p", fontsize=11, labelpad=8)
-        ax1.set_title("g^x mod p surface\n(chaotic output)", color="white", fontsize=12, pad=5)
+        ax1.set_ylabel("Prime size", fontsize=11, labelpad=8)
+        ax1.set_zlabel("g^x mod p (normalized)", fontsize=10, labelpad=8)
+        ax1.set_yticks(Y_idx)
+        ax1.set_yticklabels([str(p) for p in primes], fontsize=8)
+        ax1.set_title("g^x mod p across primes\nLarger p = more chaotic",
+                      color="white", fontsize=12, pad=5)
         ax1.view_init(elev=25, azim=-60)
         fig.canvas.draw_idle()
 
@@ -436,138 +416,125 @@ def mode_ciphertext_cloud():
 
 
 # ══════════════════════════════════════════════════════════════════════
-# 5. 3D BSGS Collision Helix
+# 5. 3D BSGS Collision Grid
 # ══════════════════════════════════════════════════════════════════════
 
 def mode_bsgs_helix():
-    print(f"\n{Fore.YELLOW}  Building BSGS collision helix...{Style.RESET_ALL}")
+    print(f"\n{Fore.YELLOW}  Building BSGS collision grid...{Style.RESET_ALL}")
 
-    # Use a small prime so the helix is visible
     p = 47
     g = find_generator(p)
     x_secret = random.randint(2, p - 3)
     h = pow(g, x_secret, p)
     m = math.isqrt(p - 1) + 1
     print(f"    p={p}, g={g}, h={h}, secret x={x_secret}")
-    print(f"    BSGS step size m={m}")
+    print(f"    BSGS step size m={m}, grid = {m}x{m} = {m*m} cells")
+    print(f"    Naive search would need up to {p-1} steps")
 
-    # Baby steps: compute g^j mod p for j = 0, 1, ..., m-1
-    baby_table = {}
-    baby_points = []  # (angle, height, value)
+    # Compute baby step values: g^j mod p for j=0..m-1
+    baby_vals = []
     power = 1
     for j in range(m):
-        val = power
-        angle = 2 * np.pi * val / p
-        baby_points.append((angle, j, val))
-        baby_table[val] = j
+        baby_vals.append(power)
         power = (power * g) % p
 
-    # Giant steps: compute h * g^(-im) mod p for i = 0, 1, ..., m-1
-    g_inv_m = pow(g, p - 1 - m, p)  # g^(-m) mod p
-    giant_points = []
-    collision_baby = None
-    collision_giant = None
+    # Compute giant step values: h * g^(-im) mod p for i=0..m-1
+    g_inv_m = pow(g, p - 1 - m, p)
+    giant_vals = []
     gamma = h
     for i in range(m):
-        val = gamma
-        angle = 2 * np.pi * val / p
-        giant_points.append((angle, i, val))
-        if val in baby_table:
-            collision_baby = (angle, baby_table[val], val)
-            collision_giant = (angle, i, val)
-            j_found = baby_table[val]
-            x_found = (i * m + j_found) % (p - 1)
-            print(f"    Collision! baby step j={j_found}, giant step i={i}")
-            print(f"    x = i*m + j = {i}*{m} + {j_found} = {x_found}")
-            break
+        giant_vals.append(gamma)
         gamma = (gamma * g_inv_m) % p
+
+    # Build the m x m difference grid: z = |baby[j] - giant[i]|
+    # Collision is where z = 0
+    J = np.arange(m)
+    I = np.arange(m)
+    J_mesh, I_mesh = np.meshgrid(J, I)
+    Z_diff = np.zeros((m, m), dtype=float)
+    collision_i, collision_j = None, None
+
+    for i in range(m):
+        for j in range(m):
+            diff = abs(baby_vals[j] - giant_vals[i])
+            Z_diff[i, j] = diff
+            if diff == 0 and collision_i is None:
+                collision_i, collision_j = i, j
+
+    if collision_i is not None:
+        x_found = (collision_i * m + collision_j) % (p - 1)
+        print(f"    Collision at grid[i={collision_i}, j={collision_j}]")
+        print(f"    x = i*m + j = {collision_i}*{m} + {collision_j} = {x_found}")
 
     fig = plt.figure(figsize=(15, 7))
     fig.patch.set_facecolor(BG_DARK)
-    fig.suptitle(f"BSGS Collision: Finding x where {g}^x = {h} (mod {p})",
+    fig.suptitle(f"BSGS: {m}x{m} Grid Search Finds x in {m*m} Steps (vs {p-1} Naive)",
                  color="white", fontsize=14, y=0.95)
 
-    # Left: 3D helix
+    # Left: 3D surface of |baby[j] - giant[i]|, collision = valley at z=0
     ax1 = fig.add_subplot(121, projection='3d')
     style_3d_ax(ax1)
 
-    # Plot baby steps as helix
-    baby_x = [np.cos(pt[0]) for pt in baby_points]
-    baby_y = [np.sin(pt[0]) for pt in baby_points]
-    baby_z = [pt[1] for pt in baby_points]
-    ax1.plot(baby_x, baby_y, baby_z, color=C_ACCENT, alpha=0.3, linewidth=0.8)
-    ax1.scatter(baby_x, baby_y, baby_z, c=C_ACCENT, s=30, alpha=0.8,
-                label=f"Baby steps (g^j)", depthshade=True)
-
-    # Plot giant steps as helix
-    giant_x = [np.cos(pt[0]) for pt in giant_points]
-    giant_y = [np.sin(pt[0]) for pt in giant_points]
-    giant_z = [pt[1] for pt in giant_points]
-    ax1.plot(giant_x, giant_y, giant_z, color=C_TEAL, alpha=0.3, linewidth=0.8)
-    ax1.scatter(giant_x, giant_y, giant_z, c=C_TEAL, s=30, alpha=0.8,
-                label=f"Giant steps (h*g^(-im))", depthshade=True)
+    # Log scale for visual clarity (add 1 to avoid log(0))
+    Z_display = np.log1p(Z_diff)
+    ax1.plot_surface(J_mesh, I_mesh, Z_display, cmap='magma',
+                     alpha=0.8, edgecolor='none', antialiased=True)
 
     # Highlight collision point
-    if collision_baby:
-        cx = np.cos(collision_baby[0])
-        cy = np.sin(collision_baby[0])
-        ax1.scatter([cx], [cy], [collision_baby[1]], c="yellow", s=200,
-                    marker="*", zorder=10, label="Collision!")
-        ax1.scatter([cx], [cy], [collision_giant[1]], c="yellow", s=200,
+    if collision_i is not None:
+        ax1.scatter([collision_j], [collision_i], [0], c="yellow", s=200,
                     marker="*", zorder=10)
+        ax1.text(collision_j, collision_i, 0.5,
+                 f"  x={x_found}", color="yellow", fontsize=10, fontweight="bold")
 
-    ax1.set_xlabel("cos(2pi*val/p)", fontsize=9, labelpad=6)
-    ax1.set_ylabel("sin(2pi*val/p)", fontsize=9, labelpad=6)
-    ax1.set_zlabel("Step index", fontsize=10, labelpad=6)
-    ax1.set_title("Cyclic group helix\nBaby/Giant steps meet at collision",
+    ax1.set_xlabel("Baby step j", fontsize=11, labelpad=8)
+    ax1.set_ylabel("Giant step i", fontsize=11, labelpad=8)
+    ax1.set_zlabel("log|baby[j] - giant[i]|", fontsize=9, labelpad=8)
+    ax1.set_title(f"Collision valley at z=0\n"
+                  f"sqrt({p-1}) = {m} steps per axis",
                   color="white", fontsize=12, pad=5)
-    ax1.legend(facecolor=BG_PANE, edgecolor="white", labelcolor="white",
-               fontsize=9, loc='upper left')
-    ax1.view_init(elev=20, azim=-50)
+    ax1.view_init(elev=35, azim=-45)
 
-    # Right: 2D unwound view (step index vs group value)
+    # Right: 2D heatmap of the same grid
     ax2 = fig.add_subplot(122)
     style_2d_ax(ax2)
-
-    baby_vals = [pt[2] for pt in baby_points]
-    giant_vals = [pt[2] for pt in giant_points]
-    ax2.scatter(range(len(baby_vals)), baby_vals, c=C_ACCENT, s=40, zorder=3,
-                label="Baby: g^j mod p", edgecolors="white", linewidths=0.3)
-    ax2.scatter(range(len(giant_vals)), giant_vals, c=C_TEAL, s=40, zorder=3,
-                label="Giant: h*g^(-im) mod p", edgecolors="white", linewidths=0.3, marker="D")
-
-    if collision_baby:
-        ax2.axhline(y=collision_baby[2], color="yellow", linestyle="--", alpha=0.7, linewidth=1.5)
-        ax2.annotate(f"Collision at value={collision_baby[2]}\nx = {x_found}",
-                     xy=(collision_baby[1], collision_baby[2]),
-                     xytext=(collision_baby[1] + 1, collision_baby[2] + p * 0.1),
+    im = ax2.imshow(Z_diff, cmap='magma_r', origin='lower', aspect='auto',
+                    extent=[0, m-1, 0, m-1])
+    if collision_i is not None:
+        ax2.scatter([collision_j], [collision_i], c="yellow", s=300,
+                    marker="*", zorder=10, edgecolors="white", linewidths=1)
+        ax2.annotate(f"Match! x = {collision_i}*{m}+{collision_j} = {x_found}",
+                     xy=(collision_j, collision_i),
+                     xytext=(collision_j + 1, collision_i + 1),
                      fontsize=9, color="yellow",
                      arrowprops=dict(arrowstyle="->", color="yellow", lw=1.5),
                      bbox=dict(boxstyle="round,pad=0.3", fc=BG_PANE, ec="yellow", alpha=0.9))
-
-    ax2.set_xlabel("Step index", color="white", fontsize=12)
-    ax2.set_ylabel("Value mod p", color="white", fontsize=12)
-    ax2.set_title(f"Unwound view: {len(baby_points)} baby + {len(giant_points)} giant steps\n"
-                  f"Total: {len(baby_points) + len(giant_points)} steps vs {p-1} naive",
+    ax2.set_xlabel("Baby step j (g^j mod p)", color="white", fontsize=12)
+    ax2.set_ylabel("Giant step i (h*g^(-im) mod p)", color="white", fontsize=12)
+    ax2.set_title(f"Heatmap: dark = close match\n"
+                  f"Black cell = collision (baby = giant)",
                   color="white", fontsize=12)
-    ax2.legend(facecolor=BG_PANE, edgecolor="white", labelcolor="white", fontsize=10)
+    cbar = fig.colorbar(im, ax=ax2, shrink=0.8)
+    cbar.set_label("|baby[j] - giant[i]|", color="white", fontsize=10)
+    cbar.ax.yaxis.set_tick_params(color="white")
+    plt.setp(plt.getp(cbar.ax.axes, 'yticklabels'), color="white")
 
-    # Toggle button: rotate helix
+    # Toggle: spin 3D view
     ax_btn = plt.axes([0.02, 0.02, 0.12, 0.05])
     btn = Button(ax_btn, 'Spin view', color=BG_PANE, hovercolor="#333")
     btn.label.set_color("white")
     btn.label.set_fontsize(9)
-    state = {"azim": -50}
+    state = {"azim": -45}
 
     def spin(event):
         state["azim"] = (state["azim"] + 45) % 360
-        ax1.view_init(elev=20, azim=state["azim"])
+        ax1.view_init(elev=35, azim=state["azim"])
         fig.canvas.draw_idle()
 
     btn.on_clicked(spin)
 
     fig.subplots_adjust(left=0.05, right=0.95, top=0.88, bottom=0.12, wspace=0.3)
-    out = os.path.join(os.path.dirname(__file__), "bsgs_helix_3d.png")
+    out = os.path.join(os.path.dirname(__file__), "bsgs_collision_3d.png")
     fig.savefig(out, dpi=150, facecolor=fig.get_facecolor())
     print(f"\n  Plot saved to {out}")
     plt.show()
