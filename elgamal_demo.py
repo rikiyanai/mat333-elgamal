@@ -1,6 +1,6 @@
 """
 ElGamal Encryption: Interactive Demo and DLP Visualizations
-Companion to MAT333 ElGamal Project — Riki Hernandez, May 2026
+Companion to MAT331 ElGamal Project - Riki Hernandez, May 2026
 
 Run: python3 elgamal_demo.py
 """
@@ -16,6 +16,7 @@ import matplotlib
 matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Button
+from mpl_toolkits.mplot3d import Axes3D, proj3d
 
 try:
     import colorama
@@ -61,8 +62,8 @@ BANNER = r"""
        ║     ███████╗███████╗╚██████╔╝██║  ██║██║ ╚═╝ ██║██║  ██║███████╗║
        ║     ╚══════╝╚══════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚═╝  ╚═╝╚══════╝║
        ║                                                           ║
-       ║        Public-Key Encryption over Z_p*                    ║
-       ║        MAT333 — Riki Hernandez — May 2026                ║
+       ║        Public Key Encryption over Z_p*                     ║
+       ║        MAT331 - Riki Hernandez - May 2026                 ║
        ║                                                           ║
        ╚═══════════════════════════════════════════════════════════╝
 """
@@ -83,15 +84,18 @@ def print_banner():
 
 def menu():
     print()
-    print(f"{Fore.GREEN}  ┌─────────────────────────────────────┐{Style.RESET_ALL}")
-    print(f"{Fore.GREEN}  │  1. Encrypt / Decrypt a message     │{Style.RESET_ALL}")
-    print(f"{Fore.GREEN}  │  2. Crack a key (BSGS attack)       │{Style.RESET_ALL}")
-    print(f"{Fore.GREEN}  │  3. Visualize: Naive vs BSGS        │{Style.RESET_ALL}")
-    print(f"{Fore.GREEN}  │  4. Visualize: Probabilistic        │{Style.RESET_ALL}")
-    print(f"{Fore.GREEN}  │     Encryption                      │{Style.RESET_ALL}")
-    print(f"{Fore.GREEN}  │  5. Visualize: DLP Timing Scaling    │{Style.RESET_ALL}")
-    print(f"{Fore.GREEN}  │  6. Quit                             │{Style.RESET_ALL}")
-    print(f"{Fore.GREEN}  └─────────────────────────────────────┘{Style.RESET_ALL}")
+    menu_text = [
+        "  ┌──────────────────────────────────────────┐",
+        "  │  1. Encrypt / Decrypt a message          │",
+        "  │  2. Crack a key (BSGS attack)            │",
+        "  │  3. 3D: DLP One-Way Landscape            │",
+        "  │  4. 3D: Ciphertext Cloud                 │",
+        "  │  5. 3D: BSGS Collision Helix             │",
+        "  │  6. Quit                                 │",
+        "  └──────────────────────────────────────────┘",
+    ]
+    for line in menu_text:
+        print(f"{Fore.CYAN}{line}{Style.RESET_ALL}")
     return input(f"{Fore.GREEN}  >> {Style.RESET_ALL}")
 
 
@@ -167,204 +171,403 @@ def mode_crack():
 
 
 # ══════════════════════════════════════════════════════════════════════
-# 3. Naive vs BSGS plot
+# Shared 3D styling helpers
 # ══════════════════════════════════════════════════════════════════════
 
-def mode_naive_vs_bsgs():
-    print(f"\n{Fore.YELLOW}  Comparing naive exhaustive search vs BSGS...{Style.RESET_ALL}")
-    bit_sizes = [8, 10, 12, 14, 16, 18, 20]
-    naive_times = []
-    bsgs_times = []
+BG_DARK = "#1a1a2e"
+BG_PANE = "#16213e"
+C_ACCENT = "#e94560"
+C_DEEP = "#0f3460"
+C_TEAL = "#00b4d8"
 
-    for bits in bit_sizes:
-        p = next_prime(random.randint(2**(bits-1), 2**bits))
-        g = find_generator(p)
-        x = random.randint(2, p - 2)
-        h = pow(g, x, p)
+def style_3d_ax(ax):
+    ax.set_facecolor(BG_PANE)
+    ax.xaxis.set_pane_color((0.086, 0.129, 0.243, 1.0))
+    ax.yaxis.set_pane_color((0.086, 0.129, 0.243, 1.0))
+    ax.zaxis.set_pane_color((0.086, 0.129, 0.243, 1.0))
+    ax.tick_params(axis='x', colors='white')
+    ax.tick_params(axis='y', colors='white')
+    ax.tick_params(axis='z', colors='white')
+    ax.xaxis.label.set_color('white')
+    ax.yaxis.label.set_color('white')
+    ax.zaxis.label.set_color('white')
+    for line in ax.xaxis.get_gridlines() + ax.yaxis.get_gridlines() + ax.zaxis.get_gridlines():
+        line.set_alpha(0.15)
+        line.set_color('white')
 
-        t0 = time.perf_counter()
-        naive_dlog(g, h, p)
-        t_naive = time.perf_counter() - t0
-
-        t0 = time.perf_counter()
-        bsgs(g, h, p)
-        t_bsgs = time.perf_counter() - t0
-
-        naive_times.append(t_naive)
-        bsgs_times.append(t_bsgs)
-        print(f"    {bits:2d}-bit:  naive={t_naive:.6f}s  BSGS={t_bsgs:.6f}s  "
-              f"({Fore.GREEN}{t_naive/max(t_bsgs,1e-9):.0f}x faster{Style.RESET_ALL})")
-
-    # Plot
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
-    fig.patch.set_facecolor("#1a1a2e")
-
-    # Left: both on same axes (log scale)
-    ax1.set_facecolor("#16213e")
-    ax1.semilogy(bit_sizes, naive_times, "s-", color="#e94560", linewidth=2,
-                 markersize=8, label="Naive O(p)", markeredgecolor="white", markeredgewidth=0.5)
-    ax1.semilogy(bit_sizes, bsgs_times, "o-", color="#0f3460", linewidth=2,
-                 markersize=8, label="BSGS O(√p)", markeredgecolor="white", markeredgewidth=0.5)
-    ax1.fill_between(bit_sizes, naive_times, bsgs_times, alpha=0.15, color="#e94560")
-    ax1.set_xlabel("Prime bit-size", color="white", fontsize=12)
-    ax1.set_ylabel("Solve time (seconds, log scale)", color="white", fontsize=12)
-    ax1.set_title("Naive vs BSGS: DLP Solve Time", color="white", fontsize=14)
-    ax1.legend(facecolor="#16213e", edgecolor="white", labelcolor="white", fontsize=11)
-    ax1.tick_params(colors="white")
-    ax1.grid(True, alpha=0.2, color="white")
-    for spine in ax1.spines.values(): spine.set_color("#333")
-
-    # Right: speedup factor
-    speedups = [n / max(b, 1e-9) for n, b in zip(naive_times, bsgs_times)]
-    ax2.set_facecolor("#16213e")
-    bars = ax2.bar(bit_sizes, speedups, color="#0f3460", edgecolor="#e94560", width=1.5)
-    for bar, s in zip(bars, speedups):
-        ax2.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.5,
-                 f"{s:.0f}x", ha="center", va="bottom", color="#e94560", fontsize=10, fontweight="bold")
-    ax2.set_xlabel("Prime bit-size", color="white", fontsize=12)
-    ax2.set_ylabel("Speedup (naive / BSGS)", color="white", fontsize=12)
-    ax2.set_title("BSGS Speedup Factor", color="white", fontsize=14)
-    ax2.tick_params(colors="white")
-    ax2.grid(True, alpha=0.2, color="white", axis="y")
-    for spine in ax2.spines.values(): spine.set_color("#333")
-
-    fig.tight_layout(pad=2)
-    out = os.path.join(os.path.dirname(__file__), "naive_vs_bsgs.png")
-    fig.savefig(out, dpi=150, facecolor=fig.get_facecolor())
-    print(f"\n  Plot saved to {out}")
-    plt.show()
-
-
-# ══════════════════════════════════════════════════════════════════════
-# 4. Probabilistic encryption visualization
-# ══════════════════════════════════════════════════════════════════════
-
-def mode_probabilistic():
-    print(f"\n{Fore.YELLOW}  Visualizing probabilistic encryption...{Style.RESET_ALL}")
-    p, g, x, h = keygen(16)
-
-    # Encrypt the letter 'A' (byte 65) many times
-    char = "A"
-    byte_val = ord(char)
-    n_encryptions = 200
-    c1_vals = []
-    c2_vals = []
-    for _ in range(n_encryptions):
-        c1, c2 = encrypt(byte_val, p, g, h)
-        c1_vals.append(c1)
-        c2_vals.append(c2)
-
-    # Also encrypt 'B' and 'C' for comparison
-    chars = {"A": ([], []), "B": ([], []), "C": ([], [])}
-    for ch in chars:
-        for _ in range(n_encryptions):
-            c1, c2 = encrypt(ord(ch), p, g, h)
-            chars[ch][0].append(c1)
-            chars[ch][1].append(c2)
-
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
-    fig.patch.set_facecolor("#1a1a2e")
-
-    # Left: scatter of (c1, c2) for letter 'A' — 200 encryptions, all different
-    ax1.set_facecolor("#16213e")
-    ax1.scatter(c1_vals, c2_vals, c="#e94560", s=12, alpha=0.7, edgecolors="none")
-    ax1.set_xlabel("c₁ = gᵏ mod p", color="white", fontsize=12)
-    ax1.set_ylabel("c₂ = m·hᵏ mod p", color="white", fontsize=12)
-    ax1.set_title(f"200 encryptions of '{char}' (byte {byte_val})\n"
-                  f"Same plaintext, all different ciphertexts",
-                  color="white", fontsize=13)
-    ax1.tick_params(colors="white")
-    ax1.grid(True, alpha=0.15, color="white")
-    for spine in ax1.spines.values(): spine.set_color("#333")
-
-    # Right: overlay A, B, C — ciphertexts are indistinguishable
-    ax2.set_facecolor("#16213e")
-    colors = {"A": "#e94560", "B": "#0f3460", "C": "#00b4d8"}
-    for ch, color in colors.items():
-        ax2.scatter(chars[ch][0], chars[ch][1], c=color, s=12, alpha=0.6,
-                    edgecolors="none", label=f"'{ch}' (byte {ord(ch)})")
-    ax2.set_xlabel("c₁", color="white", fontsize=12)
-    ax2.set_ylabel("c₂", color="white", fontsize=12)
-    ax2.set_title("A, B, C ciphertexts overlap\n"
-                  "An adversary cannot tell which letter was encrypted",
-                  color="white", fontsize=13)
-    ax2.legend(facecolor="#16213e", edgecolor="white", labelcolor="white",
-               fontsize=11, markerscale=3)
-    ax2.tick_params(colors="white")
-    ax2.grid(True, alpha=0.15, color="white")
-    for spine in ax2.spines.values(): spine.set_color("#333")
-
-    fig.tight_layout(pad=2)
-    out = os.path.join(os.path.dirname(__file__), "probabilistic.png")
-    fig.savefig(out, dpi=150, facecolor=fig.get_facecolor())
-    print(f"\n  Plot saved to {out}")
-    plt.show()
-
-
-# ══════════════════════════════════════════════════════════════════════
-# 5. DLP Timing Scaling
-# ══════════════════════════════════════════════════════════════════════
-
-def mode_timing():
-    print(f"\n{Fore.YELLOW}  Running BSGS timing across key sizes...{Style.RESET_ALL}")
-    bit_sizes = [12, 16, 20, 24, 28, 32, 36, 40]
-    trials = 3
-    results = []
-
-    for bits in bit_sizes:
-        times = []
-        for _ in range(trials):
-            p = next_prime(random.randint(2**(bits-1), 2**bits))
-            g = find_generator(p)
-            xv = random.randint(2, p - 2)
-            hv = pow(g, xv, p)
-            t0 = time.perf_counter()
-            bsgs(g, hv, p)
-            elapsed = time.perf_counter() - t0
-            times.append(elapsed)
-        avg = sum(times) / len(times)
-        results.append((bits, avg))
-        sqrt_p = 2 ** (bits / 2)
-        print(f"    {bits:2d}-bit:  avg {avg:.6f}s  (sqrt(p) ~ {sqrt_p:.0f})")
-
-    bits_list = [r[0] for r in results]
-    times_list = [r[1] for r in results]
-
-    fig, ax = plt.subplots(figsize=(10, 6))
-    fig.patch.set_facecolor("#1a1a2e")
-    ax.set_facecolor("#16213e")
-
-    ax.semilogy(bits_list, times_list, "o-", color="#e94560", linewidth=2.5,
-                markersize=10, markeredgecolor="white", markeredgewidth=1)
-
-    # Theoretical O(2^(b/2)) reference line
-    ref = [times_list[0] * (2**((b - bits_list[0])/2)) for b in bits_list]
-    ax.semilogy(bits_list, ref, "--", color="#0f3460", linewidth=1.5,
-                alpha=0.7, label="Theoretical O(2^(b/2))")
-
-    ax.fill_between(bits_list, times_list, [t * 0.001 for t in times_list],
-                    alpha=0.1, color="#e94560")
-
-    ax.set_xlabel("Prime bit-size (b)", color="white", fontsize=13)
-    ax.set_ylabel("BSGS solve time (seconds)", color="white", fontsize=13)
-    ax.set_title("DLP Difficulty vs. Key Size", color="white", fontsize=15, pad=15)
-    ax.legend(facecolor="#16213e", edgecolor="white", labelcolor="white", fontsize=11)
+def style_2d_ax(ax):
+    ax.set_facecolor(BG_PANE)
     ax.tick_params(colors="white")
-    ax.grid(True, alpha=0.2, color="white")
-    for spine in ax.spines.values(): spine.set_color("#333")
+    ax.grid(True, alpha=0.15, color="white")
+    for spine in ax.spines.values():
+        spine.set_color("#333")
 
-    # Annotation — positioned below the data to avoid overlapping the title
-    ax.annotate(
-        "At 2048 bits: ~2^1024 steps\n(heat death of the universe)",
-        xy=(bits_list[-1], times_list[-1]),
-        xytext=(bits_list[2], times_list[-1] * 0.6),
-        fontsize=10, color="white",
-        arrowprops=dict(arrowstyle="->", color="#e94560", lw=1.5),
-        bbox=dict(boxstyle="round,pad=0.4", fc="#16213e", ec="#e94560", alpha=0.9),
-    )
 
-    fig.tight_layout()
-    out = os.path.join(os.path.dirname(__file__), "dlp_timing.png")
+# ══════════════════════════════════════════════════════════════════════
+# 3. 3D DLP One-Way Landscape
+# ══════════════════════════════════════════════════════════════════════
+
+def mode_dlp_landscape():
+    print(f"\n{Fore.YELLOW}  Building DLP one-way function landscape...{Style.RESET_ALL}")
+
+    p = 97  # small prime for visual clarity
+    g = find_generator(p)
+    print(f"    Using p = {p}, generator g = {g}")
+
+    # Compute g^x mod p for all exponents
+    exponents = list(range(p - 1))
+    outputs = [pow(g, x, p) for x in exponents]
+
+    # For the 3D surface: use multiple bases
+    generators = []
+    test_g = 2
+    while len(generators) < 8 and test_g < p:
+        if pow(test_g, (p - 1) // 2, p) != 1 or pow(test_g, p - 1, p) == 1:
+            # simplified: just use several integers as bases for visual variety
+            generators.append(test_g)
+        test_g += 1
+    # Use first 6 generators for the surface
+    gens_for_surface = [find_generator(p)]
+    candidate = 3
+    while len(gens_for_surface) < 6 and candidate < p:
+        # just pick varied bases for visual effect
+        gens_for_surface.append(candidate)
+        candidate += 7
+
+    # Build surface data: X=exponent, Y=base index, Z=base^exp mod p
+    X_exp = np.arange(0, min(p - 1, 60))
+    Y_base = np.arange(len(gens_for_surface))
+    X_mesh, Y_mesh = np.meshgrid(X_exp, Y_base)
+    Z_mesh = np.zeros_like(X_mesh, dtype=float)
+    for yi, base in enumerate(gens_for_surface):
+        for xi, exp in enumerate(X_exp):
+            Z_mesh[yi, xi] = pow(base, int(exp), p)
+
+    fig = plt.figure(figsize=(15, 7))
+    fig.patch.set_facecolor(BG_DARK)
+    fig.suptitle("DLP One-Way Function: Forward is Easy, Inverse is Hard",
+                 color="white", fontsize=14, y=0.95)
+
+    # Left: 3D surface
+    ax1 = fig.add_subplot(121, projection='3d')
+    style_3d_ax(ax1)
+    surf = ax1.plot_surface(X_mesh, Y_mesh, Z_mesh, cmap='magma',
+                            alpha=0.85, edgecolor='none', antialiased=True)
+    ax1.set_xlabel("Exponent x", fontsize=11, labelpad=8)
+    ax1.set_ylabel("Base index", fontsize=11, labelpad=8)
+    ax1.set_zlabel("output mod p", fontsize=11, labelpad=8)
+    ax1.set_title("g^x mod p surface\n(chaotic output)", color="white", fontsize=12, pad=5)
+    ax1.view_init(elev=25, azim=-60)
+
+    # Right: 2D slice for the actual generator
+    ax2 = fig.add_subplot(122)
+    style_2d_ax(ax2)
+    ax2.scatter(exponents[:60], outputs[:60], c=C_ACCENT, s=18, alpha=0.8,
+                edgecolors="none", zorder=3)
+    ax2.plot(exponents[:60], outputs[:60], color=C_DEEP, alpha=0.3, linewidth=0.8)
+    ax2.set_xlabel("Exponent x", color="white", fontsize=12)
+    ax2.set_ylabel(f"{g}^x mod {p}", color="white", fontsize=12)
+    ax2.set_title(f"2D slice: g={g}, p={p}\nLooks random (one-way property)",
+                  color="white", fontsize=12)
+    ax2.axhline(y=outputs[42], color=C_TEAL, linestyle="--", alpha=0.6, linewidth=1.5)
+    ax2.annotate(f"Given output={outputs[42]}, find x=?",
+                 xy=(42, outputs[42]), xytext=(10, outputs[42] + 15),
+                 fontsize=9, color=C_TEAL,
+                 arrowprops=dict(arrowstyle="->", color=C_TEAL, lw=1.2),
+                 bbox=dict(boxstyle="round,pad=0.3", fc=BG_PANE, ec=C_TEAL, alpha=0.9))
+
+    # Hover annotation for 3D
+    annot = ax1.text2D(0.02, 0.95, "", transform=ax1.transAxes,
+                       color="white", fontsize=9,
+                       bbox=dict(boxstyle="round", fc=BG_PANE, ec=C_ACCENT, alpha=0.9))
+    annot.set_visible(False)
+
+    def on_hover_3d(event):
+        if event.inaxes == ax1:
+            annot.set_visible(True)
+            annot.set_text(f"Rotate to explore the chaotic landscape")
+            fig.canvas.draw_idle()
+        else:
+            annot.set_visible(False)
+            fig.canvas.draw_idle()
+
+    fig.canvas.mpl_connect('motion_notify_event', on_hover_3d)
+
+    # Toggle button: wireframe vs surface
+    ax_btn = plt.axes([0.02, 0.02, 0.12, 0.05])
+    btn = Button(ax_btn, 'Wireframe', color=BG_PANE, hovercolor="#333")
+    btn.label.set_color("white")
+    btn.label.set_fontsize(9)
+    state = {"wireframe": False}
+
+    def toggle_wireframe(event):
+        ax1.clear()
+        style_3d_ax(ax1)
+        if not state["wireframe"]:
+            ax1.plot_wireframe(X_mesh, Y_mesh, Z_mesh, color=C_ACCENT, alpha=0.6, linewidth=0.5)
+            btn.label.set_text("Surface")
+            state["wireframe"] = True
+        else:
+            ax1.plot_surface(X_mesh, Y_mesh, Z_mesh, cmap='magma', alpha=0.85,
+                           edgecolor='none', antialiased=True)
+            btn.label.set_text("Wireframe")
+            state["wireframe"] = False
+        ax1.set_xlabel("Exponent x", fontsize=11, labelpad=8)
+        ax1.set_ylabel("Base index", fontsize=11, labelpad=8)
+        ax1.set_zlabel("output mod p", fontsize=11, labelpad=8)
+        ax1.set_title("g^x mod p surface\n(chaotic output)", color="white", fontsize=12, pad=5)
+        ax1.view_init(elev=25, azim=-60)
+        fig.canvas.draw_idle()
+
+    btn.on_clicked(toggle_wireframe)
+
+    fig.subplots_adjust(left=0.05, right=0.95, top=0.88, bottom=0.12, wspace=0.3)
+    out = os.path.join(os.path.dirname(__file__), "dlp_landscape_3d.png")
+    fig.savefig(out, dpi=150, facecolor=fig.get_facecolor())
+    print(f"\n  Plot saved to {out}")
+    plt.show()
+
+
+# ══════════════════════════════════════════════════════════════════════
+# 4. 3D Ciphertext Cloud
+# ══════════════════════════════════════════════════════════════════════
+
+def mode_ciphertext_cloud():
+    print(f"\n{Fore.YELLOW}  Building 3D ciphertext cloud...{Style.RESET_ALL}")
+    p, g, x_priv, h = keygen(16)
+    print(f"    Generated 16-bit key: p={p}")
+
+    n_enc = 200
+    letters = {"A": 65, "B": 66, "C": 67}
+    data = {}  # letter -> (c1_list, c2_list, z_list)
+
+    for ch, byte_val in letters.items():
+        c1s, c2s, zs = [], [], []
+        for _ in range(n_enc):
+            c1, c2 = encrypt(byte_val, p, g, h)
+            c1s.append(c1)
+            c2s.append(c2)
+            zs.append(byte_val)
+        data[ch] = (c1s, c2s, zs)
+        print(f"    Encrypted '{ch}' x{n_enc}")
+
+    fig = plt.figure(figsize=(15, 7))
+    fig.patch.set_facecolor(BG_DARK)
+    fig.suptitle("Probabilistic Encryption: Same Plaintext, Different Ciphertexts",
+                 color="white", fontsize=14, y=0.95)
+
+    # Left: 3D scatter
+    ax1 = fig.add_subplot(121, projection='3d')
+    style_3d_ax(ax1)
+
+    layer_colors = {"A": C_ACCENT, "B": C_DEEP, "C": C_TEAL}
+    scatter_handles = {}
+    for ch, (c1s, c2s, zs) in data.items():
+        sc = ax1.scatter(c1s, c2s, zs, c=layer_colors[ch], s=10, alpha=0.6,
+                         label=f"'{ch}' (z={letters[ch]})", depthshade=True)
+        scatter_handles[ch] = sc
+
+    ax1.set_xlabel("c1 = g^k mod p", fontsize=10, labelpad=8)
+    ax1.set_ylabel("c2 = m*h^k mod p", fontsize=10, labelpad=8)
+    ax1.set_zlabel("Plaintext value", fontsize=10, labelpad=8)
+    ax1.set_title("3D Ciphertext Space\nEach z-layer = one plaintext letter",
+                  color="white", fontsize=12, pad=5)
+    ax1.legend(facecolor=BG_PANE, edgecolor="white", labelcolor="white", fontsize=9)
+    ax1.view_init(elev=20, azim=-45)
+
+    # Right: 2D projection (c1 vs c2), all layers overlapping
+    ax2 = fig.add_subplot(122)
+    style_2d_ax(ax2)
+    for ch, (c1s, c2s, _) in data.items():
+        ax2.scatter(c1s, c2s, c=layer_colors[ch], s=12, alpha=0.5,
+                    edgecolors="none", label=f"'{ch}'")
+    ax2.set_xlabel("c1", color="white", fontsize=12)
+    ax2.set_ylabel("c2", color="white", fontsize=12)
+    ax2.set_title("2D Projection (top-down)\nClouds overlap: adversary can't distinguish",
+                  color="white", fontsize=12)
+    ax2.legend(facecolor=BG_PANE, edgecolor="white", labelcolor="white",
+               fontsize=10, markerscale=3)
+
+    # Toggle button: show/hide layers
+    ax_btn = plt.axes([0.02, 0.02, 0.14, 0.05])
+    btn = Button(ax_btn, 'Toggle A only', color=BG_PANE, hovercolor="#333")
+    btn.label.set_color("white")
+    btn.label.set_fontsize(9)
+    state = {"mode": "all"}
+
+    def toggle_layers(event):
+        if state["mode"] == "all":
+            scatter_handles["B"].set_alpha(0.0)
+            scatter_handles["C"].set_alpha(0.0)
+            scatter_handles["A"].set_alpha(0.9)
+            btn.label.set_text("Show all")
+            state["mode"] = "A_only"
+        else:
+            scatter_handles["A"].set_alpha(0.6)
+            scatter_handles["B"].set_alpha(0.6)
+            scatter_handles["C"].set_alpha(0.6)
+            btn.label.set_text("Toggle A only")
+            state["mode"] = "all"
+        fig.canvas.draw_idle()
+
+    btn.on_clicked(toggle_layers)
+
+    # Hover annotation
+    annot_3d = ax1.text2D(0.02, 0.95, "", transform=ax1.transAxes,
+                          color="white", fontsize=9,
+                          bbox=dict(boxstyle="round", fc=BG_PANE, ec=C_ACCENT, alpha=0.9))
+    annot_3d.set_visible(False)
+
+    def on_motion(event):
+        if event.inaxes == ax1:
+            annot_3d.set_text(f"p={p} | {n_enc} encryptions per letter | Rotate to explore")
+            annot_3d.set_visible(True)
+        else:
+            annot_3d.set_visible(False)
+        fig.canvas.draw_idle()
+
+    fig.canvas.mpl_connect('motion_notify_event', on_motion)
+
+    fig.subplots_adjust(left=0.05, right=0.95, top=0.88, bottom=0.12, wspace=0.3)
+    out = os.path.join(os.path.dirname(__file__), "ciphertext_cloud_3d.png")
+    fig.savefig(out, dpi=150, facecolor=fig.get_facecolor())
+    print(f"\n  Plot saved to {out}")
+    plt.show()
+
+
+# ══════════════════════════════════════════════════════════════════════
+# 5. 3D BSGS Collision Helix
+# ══════════════════════════════════════════════════════════════════════
+
+def mode_bsgs_helix():
+    print(f"\n{Fore.YELLOW}  Building BSGS collision helix...{Style.RESET_ALL}")
+
+    # Use a small prime so the helix is visible
+    p = 47
+    g = find_generator(p)
+    x_secret = random.randint(2, p - 3)
+    h = pow(g, x_secret, p)
+    m = math.isqrt(p - 1) + 1
+    print(f"    p={p}, g={g}, h={h}, secret x={x_secret}")
+    print(f"    BSGS step size m={m}")
+
+    # Baby steps: compute g^j mod p for j = 0, 1, ..., m-1
+    baby_table = {}
+    baby_points = []  # (angle, height, value)
+    power = 1
+    for j in range(m):
+        val = power
+        angle = 2 * np.pi * val / p
+        baby_points.append((angle, j, val))
+        baby_table[val] = j
+        power = (power * g) % p
+
+    # Giant steps: compute h * g^(-im) mod p for i = 0, 1, ..., m-1
+    g_inv_m = pow(g, p - 1 - m, p)  # g^(-m) mod p
+    giant_points = []
+    collision_baby = None
+    collision_giant = None
+    gamma = h
+    for i in range(m):
+        val = gamma
+        angle = 2 * np.pi * val / p
+        giant_points.append((angle, i, val))
+        if val in baby_table:
+            collision_baby = (angle, baby_table[val], val)
+            collision_giant = (angle, i, val)
+            j_found = baby_table[val]
+            x_found = (i * m + j_found) % (p - 1)
+            print(f"    Collision! baby step j={j_found}, giant step i={i}")
+            print(f"    x = i*m + j = {i}*{m} + {j_found} = {x_found}")
+            break
+        gamma = (gamma * g_inv_m) % p
+
+    fig = plt.figure(figsize=(15, 7))
+    fig.patch.set_facecolor(BG_DARK)
+    fig.suptitle(f"BSGS Collision: Finding x where {g}^x = {h} (mod {p})",
+                 color="white", fontsize=14, y=0.95)
+
+    # Left: 3D helix
+    ax1 = fig.add_subplot(121, projection='3d')
+    style_3d_ax(ax1)
+
+    # Plot baby steps as helix
+    baby_x = [np.cos(pt[0]) for pt in baby_points]
+    baby_y = [np.sin(pt[0]) for pt in baby_points]
+    baby_z = [pt[1] for pt in baby_points]
+    ax1.plot(baby_x, baby_y, baby_z, color=C_ACCENT, alpha=0.3, linewidth=0.8)
+    ax1.scatter(baby_x, baby_y, baby_z, c=C_ACCENT, s=30, alpha=0.8,
+                label=f"Baby steps (g^j)", depthshade=True)
+
+    # Plot giant steps as helix
+    giant_x = [np.cos(pt[0]) for pt in giant_points]
+    giant_y = [np.sin(pt[0]) for pt in giant_points]
+    giant_z = [pt[1] for pt in giant_points]
+    ax1.plot(giant_x, giant_y, giant_z, color=C_TEAL, alpha=0.3, linewidth=0.8)
+    ax1.scatter(giant_x, giant_y, giant_z, c=C_TEAL, s=30, alpha=0.8,
+                label=f"Giant steps (h*g^(-im))", depthshade=True)
+
+    # Highlight collision point
+    if collision_baby:
+        cx = np.cos(collision_baby[0])
+        cy = np.sin(collision_baby[0])
+        ax1.scatter([cx], [cy], [collision_baby[1]], c="yellow", s=200,
+                    marker="*", zorder=10, label="Collision!")
+        ax1.scatter([cx], [cy], [collision_giant[1]], c="yellow", s=200,
+                    marker="*", zorder=10)
+
+    ax1.set_xlabel("cos(2pi*val/p)", fontsize=9, labelpad=6)
+    ax1.set_ylabel("sin(2pi*val/p)", fontsize=9, labelpad=6)
+    ax1.set_zlabel("Step index", fontsize=10, labelpad=6)
+    ax1.set_title("Cyclic group helix\nBaby/Giant steps meet at collision",
+                  color="white", fontsize=12, pad=5)
+    ax1.legend(facecolor=BG_PANE, edgecolor="white", labelcolor="white",
+               fontsize=9, loc='upper left')
+    ax1.view_init(elev=20, azim=-50)
+
+    # Right: 2D unwound view (step index vs group value)
+    ax2 = fig.add_subplot(122)
+    style_2d_ax(ax2)
+
+    baby_vals = [pt[2] for pt in baby_points]
+    giant_vals = [pt[2] for pt in giant_points]
+    ax2.scatter(range(len(baby_vals)), baby_vals, c=C_ACCENT, s=40, zorder=3,
+                label="Baby: g^j mod p", edgecolors="white", linewidths=0.3)
+    ax2.scatter(range(len(giant_vals)), giant_vals, c=C_TEAL, s=40, zorder=3,
+                label="Giant: h*g^(-im) mod p", edgecolors="white", linewidths=0.3, marker="D")
+
+    if collision_baby:
+        ax2.axhline(y=collision_baby[2], color="yellow", linestyle="--", alpha=0.7, linewidth=1.5)
+        ax2.annotate(f"Collision at value={collision_baby[2]}\nx = {x_found}",
+                     xy=(collision_baby[1], collision_baby[2]),
+                     xytext=(collision_baby[1] + 1, collision_baby[2] + p * 0.1),
+                     fontsize=9, color="yellow",
+                     arrowprops=dict(arrowstyle="->", color="yellow", lw=1.5),
+                     bbox=dict(boxstyle="round,pad=0.3", fc=BG_PANE, ec="yellow", alpha=0.9))
+
+    ax2.set_xlabel("Step index", color="white", fontsize=12)
+    ax2.set_ylabel("Value mod p", color="white", fontsize=12)
+    ax2.set_title(f"Unwound view: {len(baby_points)} baby + {len(giant_points)} giant steps\n"
+                  f"Total: {len(baby_points) + len(giant_points)} steps vs {p-1} naive",
+                  color="white", fontsize=12)
+    ax2.legend(facecolor=BG_PANE, edgecolor="white", labelcolor="white", fontsize=10)
+
+    # Toggle button: rotate helix
+    ax_btn = plt.axes([0.02, 0.02, 0.12, 0.05])
+    btn = Button(ax_btn, 'Spin view', color=BG_PANE, hovercolor="#333")
+    btn.label.set_color("white")
+    btn.label.set_fontsize(9)
+    state = {"azim": -50}
+
+    def spin(event):
+        state["azim"] = (state["azim"] + 45) % 360
+        ax1.view_init(elev=20, azim=state["azim"])
+        fig.canvas.draw_idle()
+
+    btn.on_clicked(spin)
+
+    fig.subplots_adjust(left=0.05, right=0.95, top=0.88, bottom=0.12, wspace=0.3)
+    out = os.path.join(os.path.dirname(__file__), "bsgs_helix_3d.png")
     fig.savefig(out, dpi=150, facecolor=fig.get_facecolor())
     print(f"\n  Plot saved to {out}")
     plt.show()
@@ -383,11 +586,11 @@ def main():
         elif choice == "2":
             mode_crack()
         elif choice == "3":
-            mode_naive_vs_bsgs()
+            mode_dlp_landscape()
         elif choice == "4":
-            mode_probabilistic()
+            mode_ciphertext_cloud()
         elif choice == "5":
-            mode_timing()
+            mode_bsgs_helix()
         elif choice == "6":
             print(f"\n{Fore.CYAN}  g^x mod p = h. Good luck solving that.{Style.RESET_ALL}\n")
             break

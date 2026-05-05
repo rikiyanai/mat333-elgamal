@@ -1,6 +1,6 @@
 """
-ElGamal public-key encryption and baby-step giant-step DLP solver.
-Companion code for the MAT333 ElGamal project.
+ElGamal public key encryption and baby-step giant-step DLP solver.
+Companion code for the MAT331 ElGamal project.
 """
 
 import math

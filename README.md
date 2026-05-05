@@ -1,19 +1,19 @@
-# ElGamal Encryption: Interactive Demo and DLP Visualizations
+# ElGamal Encryption: Interactive 3D Demo and DLP Visualizations
 
-Python companion to my MAT333 number theory project on ElGamal public-key encryption.
+Python companion to my MAT331 number theory project on ElGamal public key encryption.
 
-The Maple implementation and full writeup are in the main project directory. This repo provides an interactive demo with visualizations demonstrating ElGamal encryption and the computational hardness of the Discrete Logarithm Problem.
+The Maple implementation and full writeup are in the main project directory. This repo provides an interactive demo with 3D visualizations demonstrating ElGamal encryption and the computational hardness of the Discrete Logarithm Problem.
 
 ## Files
 
-- `elgamal.py` -- Core library: keygen, encrypt, decrypt, text message handling, baby-step giant-step DLP solver
-- `elgamal_demo.py` -- Interactive demo with 5 modes (encrypt/decrypt, BSGS key cracking, 3 visualizations)
+- `elgamal.py` - Core library: keygen, encrypt, decrypt, text message handling, baby-step giant-step DLP solver
+- `elgamal_demo.py` - Interactive demo with 5 modes (encrypt/decrypt, BSGS key cracking, 3 interactive 3D visualizations)
 
 ### Generated plots
 
-- `naive_vs_bsgs.png` -- Side-by-side: naive O(p) vs BSGS O(sqrt(p)) with speedup bars
-- `probabilistic.png` -- 200 encryptions of 'A' scattered + A/B/C ciphertext overlap
-- `dlp_timing.png` -- BSGS solve time vs bit-size with theoretical O(2^(b/2)) reference line
+- `dlp_landscape_3d.png` - 3D surface of g^x mod p showing the one-way function's chaotic output
+- `ciphertext_cloud_3d.png` - 3D ciphertext scatter (c1, c2, plaintext) showing probabilistic encryption
+- `bsgs_helix_3d.png` - 3D cyclic group helix with baby/giant step collision visualization
 
 ## Requirements
 
@@ -29,33 +29,18 @@ python3 elgamal_demo.py
 
 The interactive menu offers:
 
-1. **Encrypt / Decrypt** -- Generate keys, encrypt a message, decrypt it, see the probabilistic property
-2. **Crack a key (BSGS)** -- Generate a key and break it with baby-step giant-step
-3. **Visualize: Naive vs BSGS** -- Compare exhaustive search vs BSGS, plot speedup factors
-4. **Visualize: Probabilistic Encryption** -- Scatter plots showing ciphertext indistinguishability
-5. **Visualize: DLP Timing Scaling** -- Time BSGS across 12--40 bit primes, confirm O(2^(b/2))
+1. **Encrypt / Decrypt** - Generate keys, encrypt a message, decrypt it, see the probabilistic property
+2. **Crack a key (BSGS)** - Generate a key and break it with baby-step giant-step
+3. **3D: DLP One-Way Landscape** - 3D surface plot of g^x mod p with wireframe toggle, plus 2D slice showing the inverse problem
+4. **3D: Ciphertext Cloud** - 3D scatter of (c1, c2, plaintext) showing same-message encryptions form distinct z-layers that overlap in projection, with layer toggle
+5. **3D: BSGS Collision Helix** - Cyclic group mapped to 3D helix, baby/giant steps spiral until collision, with spin control
 
-## DLP Timing Results
-
-BSGS has O(sqrt(p)) complexity. Each 4-bit increase roughly quadruples solve time:
-
-| Bits | Avg time    | sqrt(p)   |
-|------|-------------|-----------|
-| 12   | 0.00001s    | 64        |
-| 16   | 0.00003s    | 256       |
-| 20   | 0.0001s     | 1,024     |
-| 24   | 0.0005s     | 4,096     |
-| 28   | 0.002s      | 16,384    |
-| 32   | 0.014s      | 65,536    |
-| 36   | 0.053s      | 262,144   |
-| 40   | 0.29s       | 1,048,576 |
-
-At 2048 bits (NIST minimum), BSGS would need ~2^1024 steps.
+All 3D plots feature interactive rotation, hover annotations, and toggle buttons (matching the style from my MAT200 complex roots visualizer).
 
 ## Sample Visualizations
 
-![Naive vs BSGS](naive_vs_bsgs.png)
+![DLP One-Way Landscape](dlp_landscape_3d.png)
 
-![Probabilistic Encryption](probabilistic.png)
+![Ciphertext Cloud](ciphertext_cloud_3d.png)
 
-![DLP Timing](dlp_timing.png)
+![BSGS Collision Helix](bsgs_helix_3d.png)
