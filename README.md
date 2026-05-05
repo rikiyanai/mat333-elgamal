@@ -24,16 +24,16 @@ The interactive menu offers five modes:
 
 1. **Encrypt / Decrypt** generates keys, encrypts a message, decrypts it, and shows the probabilistic property.
 2. **Crack a key (BSGS)** generates a key and breaks it with baby step giant step.
-3. **3D: DLP One-Way Landscape** renders g^x mod p as a 3D surface across multiple primes, with a 2D slice showing the inverse problem.
-4. **3D: Ciphertext Cloud** plots (c1, c2, plaintext) in 3D, showing same-message encryptions form distinct z-layers that overlap in projection.
-5. **3D: BSGS Collision Grid** visualizes the sqrt(p) x sqrt(p) search structure as a 3D surface, with the collision valley where baby and giant steps match.
+3. **3D: DLP One Way Landscape** renders g^x mod p as a 3D surface across multiple primes, with a 2D slice showing the inverse problem.
+4. **3D: Ciphertext Cloud** plots (c1, c2, plaintext) in 3D, showing that encrypting the same letter repeatedly produces distinct z layers that overlap in projection.
+5. **3D: DLP Needle in a Haystack** shows every possible exponent as a bar, with only ONE matching the target. Visually demonstrates the 1/(p-1) odds of guessing correctly, and how BSGS narrows the search from p to sqrt(p).
 
 All 3D plots feature interactive rotation, hover annotations, and toggle buttons.
 
 ## Sample Visualizations
 
-![DLP One-Way Landscape](dlp_landscape_3d.png)
+![DLP One Way Landscape](dlp_landscape_3d.png)
 
 ![Ciphertext Cloud](ciphertext_cloud_3d.png)
 
-![BSGS Collision Grid](bsgs_collision_3d.png)
+![DLP Needle in a Haystack](dlp_needle_3d.png)

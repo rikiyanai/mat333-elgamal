@@ -90,7 +90,7 @@ def menu():
         "  │  2. Crack a key (BSGS attack)            │",
         "  │  3. 3D: DLP One-Way Landscape            │",
         "  │  4. 3D: Ciphertext Cloud                 │",
-        "  │  5. 3D: BSGS Collision Grid              │",
+        "  │  5. 3D: DLP Needle in a Haystack          │",
         "  │  6. Quit                                 │",
         "  └──────────────────────────────────────────┘",
     ]
@@ -416,125 +416,138 @@ def mode_ciphertext_cloud():
 
 
 # ══════════════════════════════════════════════════════════════════════
-# 5. 3D BSGS Collision Grid
+# 5. 3D DLP Needle in a Haystack
 # ══════════════════════════════════════════════════════════════════════
 
 def mode_bsgs_helix():
-    print(f"\n{Fore.YELLOW}  Building BSGS collision grid...{Style.RESET_ALL}")
+    print(f"\n{Fore.YELLOW}  Building DLP needle in a haystack...{Style.RESET_ALL}")
 
-    p = 47
+    p = 97
     g = find_generator(p)
     x_secret = random.randint(2, p - 3)
     h = pow(g, x_secret, p)
-    m = math.isqrt(p - 1) + 1
-    print(f"    p={p}, g={g}, h={h}, secret x={x_secret}")
-    print(f"    BSGS step size m={m}, grid = {m}x{m} = {m*m} cells")
-    print(f"    Naive search would need up to {p-1} steps")
+    n = p - 1  # group order
+    m = math.isqrt(n) + 1
+    print(f"    p={p}, g={g}, target h={h}")
+    print(f"    Secret x={x_secret} (the needle)")
+    print(f"    Haystack size: {n} possible exponents")
+    print(f"    Odds of guessing: 1/{n} = {100/n:.1f}%")
 
-    # Compute baby step values: g^j mod p for j=0..m-1
-    baby_vals = []
-    power = 1
-    for j in range(m):
-        baby_vals.append(power)
-        power = (power * g) % p
+    # Compute g^x mod p for every candidate x, measure distance from target h
+    candidates = list(range(n))
+    values = [pow(g, x, p) for x in candidates]
+    # Distance: circular distance in Z_p (min of |val-h| and p-|val-h|)
+    distances = [min(abs(v - h), p - abs(v - h)) for v in values]
 
-    # Compute giant step values: h * g^(-im) mod p for i=0..m-1
-    g_inv_m = pow(g, p - 1 - m, p)
-    giant_vals = []
-    gamma = h
-    for i in range(m):
-        giant_vals.append(gamma)
-        gamma = (gamma * g_inv_m) % p
+    # Bar colors: the needle is bright, everything else is dim
+    bar_colors = []
+    for x in candidates:
+        if x == x_secret:
+            bar_colors.append("yellow")
+        else:
+            bar_colors.append(C_ACCENT)
 
-    # Build the m x m difference grid: z = |baby[j] - giant[i]|
-    # Collision is where z = 0
-    J = np.arange(m)
-    I = np.arange(m)
-    J_mesh, I_mesh = np.meshgrid(J, I)
-    Z_diff = np.zeros((m, m), dtype=float)
-    collision_i, collision_j = None, None
-
-    for i in range(m):
-        for j in range(m):
-            diff = abs(baby_vals[j] - giant_vals[i])
-            Z_diff[i, j] = diff
-            if diff == 0 and collision_i is None:
-                collision_i, collision_j = i, j
-
-    if collision_i is not None:
-        x_found = (collision_i * m + collision_j) % (p - 1)
-        print(f"    Collision at grid[i={collision_i}, j={collision_j}]")
-        print(f"    x = i*m + j = {collision_i}*{m} + {collision_j} = {x_found}")
-
-    fig = plt.figure(figsize=(15, 7))
+    fig = plt.figure(figsize=(16, 7))
     fig.patch.set_facecolor(BG_DARK)
-    fig.suptitle(f"BSGS: {m}x{m} Grid Search Finds x in {m*m} Steps (vs {p-1} Naive)",
+    fig.suptitle(f"Finding x where {g}^x = {h} (mod {p}): 1 Needle in {n} Candidates",
                  color="white", fontsize=14, y=0.95)
 
-    # Left: 3D surface of |baby[j] - giant[i]|, collision = valley at z=0
+    # Left: 3D bar chart showing every candidate's distance from target
     ax1 = fig.add_subplot(121, projection='3d')
     style_3d_ax(ax1)
 
-    # Log scale for visual clarity (add 1 to avoid log(0))
-    Z_display = np.log1p(Z_diff)
-    ax1.plot_surface(J_mesh, I_mesh, Z_display, cmap='magma',
-                     alpha=0.8, edgecolor='none', antialiased=True)
+    xs = np.array(candidates)
+    ys = np.zeros_like(xs)
+    zs = np.zeros_like(xs)
+    dx = np.ones_like(xs) * 0.8
+    dy = np.ones_like(xs) * 0.8
+    dz = np.array(distances, dtype=float)
 
-    # Highlight collision point
-    if collision_i is not None:
-        ax1.scatter([collision_j], [collision_i], [0], c="yellow", s=200,
-                    marker="*", zorder=10)
-        ax1.text(collision_j, collision_i, 0.5,
-                 f"  x={x_found}", color="yellow", fontsize=10, fontweight="bold")
+    # Normalize distances for coloring
+    max_d = max(distances) if max(distances) > 0 else 1
+    norm_d = [d / max_d for d in distances]
+    rgba_colors = []
+    for x_val, nd in zip(candidates, norm_d):
+        if x_val == x_secret:
+            rgba_colors.append((1.0, 1.0, 0.0, 1.0))  # yellow needle
+        else:
+            rgba_colors.append((0.91, 0.27, 0.37, 0.3 + 0.5 * nd))  # C_ACCENT with alpha
 
-    ax1.set_xlabel("Baby step j", fontsize=11, labelpad=8)
-    ax1.set_ylabel("Giant step i", fontsize=11, labelpad=8)
-    ax1.set_zlabel("log|baby[j] - giant[i]|", fontsize=9, labelpad=8)
-    ax1.set_title(f"Collision valley at z=0\n"
-                  f"sqrt({p-1}) = {m} steps per axis",
+    ax1.bar3d(xs, ys, zs, dx, dy, dz, color=rgba_colors, zsort='average')
+
+    # Mark the needle explicitly
+    ax1.scatter([x_secret], [0], [0], c="yellow", s=150, marker="*", zorder=10)
+
+    ax1.set_xlabel("Candidate x", fontsize=10, labelpad=8)
+    ax1.set_ylabel("", fontsize=1)
+    ax1.set_zlabel("Distance from target h", fontsize=10, labelpad=8)
+    ax1.set_title(f"Every wrong guess towers above\nOnly x={x_secret} hits zero",
                   color="white", fontsize=12, pad=5)
-    ax1.view_init(elev=35, azim=-45)
+    ax1.set_yticks([])
+    ax1.view_init(elev=25, azim=-70)
 
-    # Right: 2D heatmap of the same grid
+    # Right: 2D "skyline" view with BSGS overlay
     ax2 = fig.add_subplot(122)
     style_2d_ax(ax2)
-    im = ax2.imshow(Z_diff, cmap='magma_r', origin='lower', aspect='auto',
-                    extent=[0, m-1, 0, m-1])
-    if collision_i is not None:
-        ax2.scatter([collision_j], [collision_i], c="yellow", s=300,
-                    marker="*", zorder=10, edgecolors="white", linewidths=1)
-        ax2.annotate(f"Match! x = {collision_i}*{m}+{collision_j} = {x_found}",
-                     xy=(collision_j, collision_i),
-                     xytext=(collision_j + 1, collision_i + 1),
-                     fontsize=9, color="yellow",
-                     arrowprops=dict(arrowstyle="->", color="yellow", lw=1.5),
-                     bbox=dict(boxstyle="round,pad=0.3", fc=BG_PANE, ec="yellow", alpha=0.9))
-    ax2.set_xlabel("Baby step j (g^j mod p)", color="white", fontsize=12)
-    ax2.set_ylabel("Giant step i (h*g^(-im) mod p)", color="white", fontsize=12)
-    ax2.set_title(f"Heatmap: dark = close match\n"
-                  f"Black cell = collision (baby = giant)",
-                  color="white", fontsize=12)
-    cbar = fig.colorbar(im, ax=ax2, shrink=0.8)
-    cbar.set_label("|baby[j] - giant[i]|", color="white", fontsize=10)
-    cbar.ax.yaxis.set_tick_params(color="white")
-    plt.setp(plt.getp(cbar.ax.axes, 'yticklabels'), color="white")
 
-    # Toggle: spin 3D view
-    ax_btn = plt.axes([0.02, 0.02, 0.12, 0.05])
-    btn = Button(ax_btn, 'Spin view', color=BG_PANE, hovercolor="#333")
+    # Draw all bars as a skyline
+    bar_cols_2d = [("yellow" if x == x_secret else C_ACCENT) for x in candidates]
+    bar_alphas = [(1.0 if x == x_secret else 0.4) for x in candidates]
+    bars = ax2.bar(candidates, distances, width=1.0, color=bar_cols_2d, edgecolor="none")
+    for bar, alpha in zip(bars, bar_alphas):
+        bar.set_alpha(alpha)
+
+    # Mark the needle
+    ax2.annotate(f"x={x_secret}\n(the answer)",
+                 xy=(x_secret, 0), xytext=(x_secret + n * 0.15, max(distances) * 0.3),
+                 fontsize=10, color="yellow", fontweight="bold",
+                 arrowprops=dict(arrowstyle="->", color="yellow", lw=2),
+                 bbox=dict(boxstyle="round,pad=0.3", fc=BG_PANE, ec="yellow", alpha=0.9))
+
+    # Show BSGS efficiency
+    bsgs_text = (f"Guessing: 1/{n} chance ({100/n:.1f}%)\n"
+                 f"Naive search: up to {n} checks\n"
+                 f"BSGS: only {2*m} checks (sqrt)\n"
+                 f"At 2048 bits: 2^2048 candidates\n"
+                 f"  BSGS still needs 2^1024")
+    ax2.text(0.98, 0.98, bsgs_text, transform=ax2.transAxes,
+             fontsize=9, color="white", verticalalignment='top', horizontalalignment='right',
+             bbox=dict(boxstyle="round,pad=0.5", fc=BG_PANE, ec=C_TEAL, alpha=0.9),
+             family='monospace')
+
+    ax2.set_xlabel("Candidate exponent x", color="white", fontsize=12)
+    ax2.set_ylabel("Distance from target h", color="white", fontsize=12)
+    ax2.set_title(f"The haystack: {n} candidates, 1 correct\n"
+                  f"How lucky would you have to be?",
+                  color="white", fontsize=12)
+
+    # Toggle: show BSGS checked candidates
+    ax_btn = plt.axes([0.02, 0.02, 0.15, 0.05])
+    btn = Button(ax_btn, 'Show BSGS path', color=BG_PANE, hovercolor="#333")
     btn.label.set_color("white")
     btn.label.set_fontsize(9)
-    state = {"azim": -45}
+    state = {"showing_bsgs": False}
 
-    def spin(event):
-        state["azim"] = (state["azim"] + 45) % 360
-        ax1.view_init(elev=35, azim=state["azim"])
+    def toggle_bsgs(event):
+        if not state["showing_bsgs"]:
+            # Highlight which candidates BSGS actually checks
+            # Baby steps check: x = 0, 1, ..., m-1
+            for j in range(m):
+                ax2.axvline(x=j, color=C_TEAL, alpha=0.4, linewidth=1.5)
+            # Giant steps check: x = 0, m, 2m, 3m, ...
+            for i in range(m):
+                ax2.axvline(x=(i * m) % n, color=C_DEEP, alpha=0.6, linewidth=1.5, linestyle=":")
+            ax2.text(0.02, 0.02, f"Teal = {m} baby steps | Blue = {m} giant steps | Total: {2*m}/{n}",
+                     transform=ax2.transAxes, fontsize=8, color=C_TEAL,
+                     bbox=dict(fc=BG_PANE, ec=C_TEAL, alpha=0.9, boxstyle="round,pad=0.3"))
+            btn.label.set_text("Hide BSGS")
+            state["showing_bsgs"] = True
         fig.canvas.draw_idle()
 
-    btn.on_clicked(spin)
+    btn.on_clicked(toggle_bsgs)
 
-    fig.subplots_adjust(left=0.05, right=0.95, top=0.88, bottom=0.12, wspace=0.3)
-    out = os.path.join(os.path.dirname(__file__), "bsgs_collision_3d.png")
+    fig.subplots_adjust(left=0.05, right=0.95, top=0.88, bottom=0.12, wspace=0.25)
+    out = os.path.join(os.path.dirname(__file__), "dlp_needle_3d.png")
     fig.savefig(out, dpi=150, facecolor=fig.get_facecolor())
     print(f"\n  Plot saved to {out}")
     plt.show()
